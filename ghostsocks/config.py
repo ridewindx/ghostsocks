@@ -22,5 +22,7 @@ def parse_args(is_server):
                                      epilog='Online help: github.com/ghostsocks/ghostsocks')
     proxy_group = parser.add_argument_group('Proxy options')
     proxy_group.add_argument('-c', '--config', default='./config.py', help='path to config file')
+    proxy_group.add_argument('-s', '--listen_addr', default='0.0.0.0', help='listening address')
+    proxy_group.add_argument('-p', '--listen_ports', default='0.0.0.0', help='listening address')
     general_group = parser.add_argument_group('General options')
     args = parser.parse_args()
