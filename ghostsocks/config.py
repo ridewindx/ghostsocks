@@ -4,15 +4,42 @@
 
 import argparse
 from functools import partial
+import socket
 
 
-def _addr_ports(multiple, string):
-    addr, ports = string.split(':')
-    ports = [p for p in ports.split(',') if p]
+def _check_ip(ip):
+    try:
+        socket.inet_aton(ip)
+    except socket.error as e:
+        raise SyntaxError('%s: %s' % (e, ip))
+
+
+def _check_port(port):
+    int(port)
+
+
+def _check_passwd(passwd):
+    if not passwd:
+        raise ValueError('password too short')
+
+
+def _addr_ports(passwd, multiple, string):
+    addr, rem = string.split(':')
+    _check_ip(addr)
+    if not passwd and not multiple:
+        port = rem
+        _check_port(port)
+        return addr, port
+    ports = [p for p in rem.split(',') if p]
+    pps = [pp.split('/') for pp in ports]
     if multiple:
-        return addr, tuple(ports)
+        for pp in pps:
+            port, passwd = pp
+            _check_port(port)
+            _check_passwd(passwd)
     else:
-        return addr, ports[0]
+        if len(pps) != 1:
+            raise ValueError('')
 
 
 config = argparse.Namespace()
@@ -35,13 +62,15 @@ def parse_args(is_server):
     proxy_group = parser.add_argument_group('Proxy options')
     proxy_group.add_argument('-c', '--config', default='./config.py', help='path to config file')
     if is_server:
-        proxy_group.add_argument('-l', '--listen', type=partial(True, _addr_ports), default='0.0.0.0:9000',
-                                 help='listening address and port(s), e.g., 138.128.200.120:9000,9080')
+        proxy_group.add_argument('-l', '--listen', type=partial(_addr_ports, True, True), default='0.0.0.0:9000/123456',
+                                 help='listening address, and port-passwd pair(s), '\
+                                 'e.g., 138.128.200.120:9000/123456,9080/234567')
     else:
-        proxy_group.add_argument('-l', '--listen', type=partial(True, _addr_ports), default='0.0.0.0:1080',
-                                 help='listening address and port(s), e.g., 127.0.0.1:1000,1080')
-        proxy_group.add_argument('-r', '--remote', type=partial(False, _addr_ports), default='0.0.0.0:9000',
-                                 help='remote address and port, e.g., 138.128.200.120:9000')
+        proxy_group.add_argument('-l', '--listen', type=partial(_addr_ports, False, False), default='127.0.0.1:1080',
+                                 help='listening address and port')
+        proxy_group.add_argument('-r', '--remote', type=partial(_addr_ports, True, False), action='append',
+                                 help='remote address, port and password triple, '\
+                                 'e.g., 138.128.200.120:9000/123456')
     proxy_group.add_argument('-p', '--password', nargs='+', help='validation passwords, one-one mapping to ports')
     proxy_group.add_argument('-e', '--encryption', default='aes-256-cfb', help='encryption method')
     proxy_group.add_argument('-t', '--timeout', type=int, default=300, help='timeout in seconds')
